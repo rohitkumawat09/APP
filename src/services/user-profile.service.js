@@ -86,30 +86,40 @@ export const updateUserProfileService = async ({ userId, body, file }) => {
       }
     }
 
-    const updateData = {
-      ...body,
-    };
+    const updateData = {};
+
+    // Only add fields that are provided and not empty
+    if (body.fullName) updateData.fullName = body.fullName;
+    if (body.bio) updateData.bio = body.bio;
+    if (body.phone) updateData.phone = body.phone;
+    if (body.address) updateData.address = body.address;
+    if (body.city) updateData.city = body.city;
+    if (body.state) updateData.state = body.state;
+    if (body.gender) updateData.gender = body.gender;
+    if (body.dateOfBirth) updateData.dateOfBirth = body.dateOfBirth;
 
     if (avatar) {
       updateData.avatar = avatar;
       updateData.avatarPath = avatarPath;
     }
 
-  const updatedProfile = await UserProfile.findOneAndUpdate(
-    { userId },
-    updateData,
-    {
-      returnDocument: "after",
-      runValidators: true,
-    },
-  ).populate("userId", "email");
+    console.log('[updateUserProfileService] Update data:', updateData);
 
-  // update fullname in user collection
-  if (body.fullName) {
-    await User.findByIdAndUpdate(userId, {
-      fullName: body.fullName,
-    });
-  }
+    const updatedProfile = await UserProfile.findOneAndUpdate(
+      { userId },
+      updateData,
+      {
+        new: true,
+        runValidators: true,
+      },
+    ).populate("userId", "email");
+
+    // update fullname in user collection
+    if (body.fullName) {
+      await User.findByIdAndUpdate(userId, {
+        fullName: body.fullName,
+      });
+    }
 
     const profileObj = updatedProfile.toObject();
 
@@ -123,10 +133,25 @@ export const updateUserProfileService = async ({ userId, body, file }) => {
       },
     };
   } catch (error) {
+    console.error(`[updateUserProfileService] Error: ${error.message}`);
     logger.error(`updateUserProfileService error: ${error.message}`);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message,
+      }));
+      return {
+        status: 400,
+        message: "Validation failed",
+        errors,
+      };
+    }
+
     return {
       status: 500,
-      message: "Failed to update profile",
+      message: error.message || "Failed to update profile",
     };
   }
 };

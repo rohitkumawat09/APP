@@ -33,6 +33,7 @@ const startServer = async () => {
 
     server.listen(PORT, '0.0.0.0', () => {
   logger.info(`[SERVER] Server running on port ${PORT}`);
+  
 });
   } catch (error) {
     logger.error(error, "Server start failed");

@@ -92,7 +92,7 @@ export const updateUserProfileSchema = z.object({
     emptyToUndefined,
     z
       .string()
-      .regex(/^[0-9]{10}$/)
+      .regex(/^[0-9+\-\s()]{7,}$/, "Phone must be at least 7 characters")
       .optional(),
   ),
 
@@ -107,7 +107,7 @@ export const updateUserProfileSchema = z.object({
     z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
   ),
 
-  dateOfBirth: z.preprocess(emptyToUndefined, z.string().optional()),
+  dateOfBirth: z.preprocess(emptyToUndefined, z.string().datetime().optional()),
 });
 
 export const updateThemeSchema = z.object({

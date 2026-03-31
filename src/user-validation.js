@@ -107,7 +107,21 @@ export const updateUserProfileSchema = z.object({
     z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
   ),
 
-  dateOfBirth: z.preprocess(emptyToUndefined, z.string().datetime().optional()),
+  dateOfBirth: z.preprocess(
+    emptyToUndefined,
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Date of Birth must be in YYYY-MM-DD format")
+      .refine(
+        (dateString) => {
+          const date = new Date(dateString);
+          const today = new Date();
+          return !isNaN(date.getTime()) && date <= today && date.getFullYear() >= 1900;
+        },
+        "Date of Birth must be a valid past date (1900 onwards)",
+      )
+      .optional(),
+  ),
 });
 
 export const updateThemeSchema = z.object({

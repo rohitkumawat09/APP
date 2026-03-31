@@ -107,9 +107,9 @@ export const updateUserProfileService = async ({ userId, body, file }) => {
 
     const updatedProfile = await UserProfile.findOneAndUpdate(
       { userId },
-      updateData,
+      { $set: updateData },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       },
     ).populate("userId", "email");

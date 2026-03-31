@@ -43,32 +43,60 @@ export const googleLoginService = async ({ code, ip, userAgent }) => {
       };
     }
 
+    let idToken = code;
+    let payload;
+
     /* =====================================================
-       1️⃣ Exchange authorization code for tokens
+       1️⃣ Check if code is already an ID token (from native SDK)
+       or needs to be exchanged (from web OAuth)
     ===================================================== */
 
-    const { tokens } = await googleClient.getToken({
-      code,
-      redirect_uri: env.GOOGLE_REDIRECT_URI,
-    });
+    if (code.split('.').length === 3) {
+      // Code looks like a JWT token (idToken from native SDK)
+      console.log('[googleLoginService] Detected native SDK idToken');
+      
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: code,
+          audience: env.GOOGLE_WEB_CLIENT_ID,
+        });
+        payload = ticket.getPayload();
+      } catch (error) {
+        logger.warn(`[googleLoginService] Failed to verify idToken: ${error.message}`);
+        return {
+          status: 401,
+          message: "Invalid Google token",
+        };
+      }
+    } else {
+      // Code is an authorization code (from web OAuth)
+      console.log('[googleLoginService] Detected authorization code');
+      
+      const { tokens } = await googleClient.getToken({
+        code,
+        redirect_uri: env.GOOGLE_REDIRECT_URI,
+      });
 
-    if (!tokens?.id_token) {
-      return {
-        status: 401,
-        message: "Failed to retrieve Google ID token",
-      };
+      if (!tokens?.id_token) {
+        return {
+          status: 401,
+          message: "Failed to retrieve Google ID token",
+        };
+      }
+
+      idToken = tokens.id_token;
+
+      /* =====================================================
+         2️⃣ Verify Google ID Token
+      ===================================================== */
+
+      const ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: env.GOOGLE_WEB_CLIENT_ID,
+      });
+
+      payload = ticket.getPayload();
     }
-
-    /* =====================================================
-       2️⃣ Verify Google ID Token
-    ===================================================== */
-
-    const ticket = await googleClient.verifyIdToken({
-      idToken: tokens.id_token,
-      audience: env.GOOGLE_WEB_CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload();
 
     if (!payload?.email || !payload?.sub) {
       return {
@@ -301,7 +329,7 @@ export const registerUserService = async ({ email, password, fullName }) => {
         expiresAt,
         attempts: 0,
       },
-      { upsert: true },
+      { upsert: true, returnDocument: 'after' },
     );
 
     // Send Email
@@ -356,7 +384,7 @@ export const registerUserService = async ({ email, password, fullName }) => {
       expiresAt,
       attempts: 0,
     },
-    { upsert: true },
+    { upsert: true, returnDocument: 'after' },
   );
   // Send Email
   const emailResult = await sendEmail({
@@ -674,7 +702,7 @@ export const forgotPasswordService = async ({ email }) => {
       expiresAt,
       attempts: 0,
     },
-    { upsert: true },
+    { upsert: true, returnDocument: 'after' },
   );
 
   // Send Email

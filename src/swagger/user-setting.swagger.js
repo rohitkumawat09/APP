@@ -1,40 +1,4 @@
 export const userSettingsSwagger = {
-  "/api/users/settings/theme": {
-    patch: {
-      tags: ["User Settings"],
-      summary: "Update theme",
-      description: "Update user theme (light/dark mode)",
-      security: [{ userCookieAuth: [] }],
-
-      requestBody: {
-        required: true,
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                theme: {
-                  type: "string",
-                  enum: ["LIGHT", "DARK"],
-                  example: "DARK",
-                },
-              },
-              required: ["theme"],
-            },
-          },
-        },
-      },
-
-      responses: {
-        200: {
-          description: "Theme updated successfully",
-        },
-        401: { description: "Unauthorized" },
-        500: { description: "Server error" },
-      },
-    },
-  },
-
   "/api/users/settings/online-status": {
     patch: {
       tags: ["User Settings"],

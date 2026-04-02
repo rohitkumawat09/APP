@@ -1,5 +1,6 @@
 import userSession from "../models/user-session.js";
 import {
+  googleLoginService,
   loginUserService,
   registerUserService,
   verifyEmailService,
@@ -7,7 +8,6 @@ import {
   verifyForgotPasswordService,
   userResetPasswordService,
   refreshUserTokenService,
-  googleLoginService,
   checkTokenService,
 } from "../services/user-auth.service.js";
 import {
@@ -37,20 +37,15 @@ export const googleLogin = async (req, res) => {
       });
     }
 
-    // ✅ Set cookies for web
     res.cookie("userAccessToken", result.accessToken, ACCESS_COOKIE_OPTIONS);
     res.cookie("userRefreshToken", result.refreshToken, REFRESH_COOKIE_OPTIONS);
 
     logSecurely("GOOGLE_LOGIN_SUCCESS", result.user.email);
 
-    // ✅ Return ONLY safe data - sanitize user object
     return res.status(200).json({
       success: true,
       message: "Google login successful",
       user: sanitizeUser(result.user),
-      // Mobile tokens (Web uses cookies)
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
     });
   } catch (error) {
     logger.error(`GOOGLE LOGIN ERROR: ${error.message}`);

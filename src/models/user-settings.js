@@ -12,12 +12,6 @@ const userSettingsSchema = new Schema(
       index: true,
     },
 
-    theme: {
-      type: String,
-      enum: ["LIGHT", "DARK", "SYSTEM"],
-      default: "SYSTEM",
-    },
-
     showOnlineStatus: {
       type: Boolean,
       default: true,

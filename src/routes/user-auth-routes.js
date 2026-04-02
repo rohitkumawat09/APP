@@ -14,6 +14,7 @@ import {
 import { validate } from "../middlewares/validate.js";
 import {
   emailSchema,
+  googleLoginSchema,
   registerSchema,
   userLoginSchema,
   userResetPasswordSchema,
@@ -22,7 +23,7 @@ import {
 import { verifyUserAccessToken } from "../middlewares/user-auth.middleware.js";
 
 const router = express.Router();
-router.post("/google-login", googleLogin);
+router.post("/google-login", validate(googleLoginSchema), googleLogin);
 router.post("/register", validate(registerSchema), register);
 router.post("/verify-email", validate(verifyEmailSchema), verifyEmail);
 

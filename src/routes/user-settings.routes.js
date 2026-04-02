@@ -3,7 +3,6 @@ import { verifyUserAccessToken } from "../middlewares/user-auth.middleware.js";
 
 import { validate } from "../middlewares/validate.js";
 import {
-  updateThemeSchema,
   updateOnlineStatusSchema,
   changePasswordSchema,
 } from "../user-validation.js";
@@ -14,14 +13,11 @@ import {
   logoutAllDevices,
   logoutSingleSession,
   updateOnlineStatus,
-  updateTheme,
 } from "../controllers/user-settings.controller.js";
 
 const router = express.Router();
 
 router.use(verifyUserAccessToken);
-
-router.patch("/theme", validate(updateThemeSchema), updateTheme);
 
 router.patch(
   "/online-status",

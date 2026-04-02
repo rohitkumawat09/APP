@@ -3,6 +3,10 @@ import { z } from "zod";
 const passwordRegex =
   /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])[A-Za-z0-9!@#$%^&*]{8,}$/;
 
+export const googleLoginSchema = z.object({
+  code: z.string().min(1, "Google authorization code is required"),
+});
+
 export const registerSchema = z.object({
   fullName: z.string().min(3, "Full name must be at least 3 characters"),
 
@@ -122,10 +126,6 @@ export const updateUserProfileSchema = z.object({
       )
       .optional(),
   ),
-});
-
-export const updateThemeSchema = z.object({
-  theme: z.enum(["LIGHT", "DARK"]),
 });
 
 export const updateOnlineStatusSchema = z.object({

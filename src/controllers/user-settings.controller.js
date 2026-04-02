@@ -4,18 +4,9 @@ import {
   changePasswordService,
   logoutAllDevicesService,
   updateOnlineStatusService,
-  updateThemeService,
   getActiveSessionsService,
 } from "../services/user-settings.service.js";
 import { getIO } from "../sockets/socket.js";
-
-export const updateTheme = async (req, res) => {
-  const userId = req.user.userId;
-
-  const result = await updateThemeService(userId, req.body);
-
-  res.status(result.status).json(result);
-};
 
 export const updateOnlineStatus = async (req, res) => {
   const userId = req.user.userId;

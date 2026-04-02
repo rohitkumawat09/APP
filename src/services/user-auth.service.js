@@ -43,60 +43,34 @@ export const googleLoginService = async ({ code, ip, userAgent }) => {
       };
     }
 
-    let idToken = code;
-    let payload;
+    const looksLikeGoogleIdToken =
+      /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(code);
 
-    /* =====================================================
-       1️⃣ Check if code is already an ID token (from native SDK)
-       or needs to be exchanged (from web OAuth)
-    ===================================================== */
-
-    if (code.split('.').length === 3) {
-      // Code looks like a JWT token (idToken from native SDK)
-      console.log('[googleLoginService] Detected native SDK idToken');
-      
-      try {
-        const ticket = await googleClient.verifyIdToken({
-          idToken: code,
-          audience: env.GOOGLE_WEB_CLIENT_ID,
-        });
-        payload = ticket.getPayload();
-      } catch (error) {
-        logger.warn(`[googleLoginService] Failed to verify idToken: ${error.message}`);
-        return {
-          status: 401,
-          message: "Invalid Google token",
-        };
-      }
-    } else {
-      // Code is an authorization code (from web OAuth)
-      console.log('[googleLoginService] Detected authorization code');
-      
-      const { tokens } = await googleClient.getToken({
-        code,
-        redirect_uri: env.GOOGLE_REDIRECT_URI,
-      });
-
-      if (!tokens?.id_token) {
-        return {
-          status: 401,
-          message: "Failed to retrieve Google ID token",
-        };
-      }
-
-      idToken = tokens.id_token;
-
-      /* =====================================================
-         2️⃣ Verify Google ID Token
-      ===================================================== */
-
-      const ticket = await googleClient.verifyIdToken({
-        idToken,
-        audience: env.GOOGLE_WEB_CLIENT_ID,
-      });
-
-      payload = ticket.getPayload();
+    if (looksLikeGoogleIdToken) {
+      return {
+        status: 403,
+        message: "Google login is available only on the website",
+      };
     }
+
+    const { tokens } = await googleClient.getToken({
+      code,
+      redirect_uri: env.GOOGLE_REDIRECT_URI,
+    });
+
+    if (!tokens?.id_token) {
+      return {
+        status: 401,
+        message: "Failed to retrieve Google ID token",
+      };
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: env.GOOGLE_WEB_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
 
     if (!payload?.email || !payload?.sub) {
       return {
@@ -107,47 +81,24 @@ export const googleLoginService = async ({ code, ip, userAgent }) => {
 
     const email = payload.email.toLowerCase().trim();
     const googleId = payload.sub;
-    // ✅ Ensure fullName is at least 4 characters
     let fullName = payload.name || "Google User";
+
     if (fullName.length < 4) {
       fullName = fullName.padEnd(4, ".");
     }
-
-    /* =====================================================
-       3️⃣ Find existing user
-    ===================================================== */
 
     let user = await User.findOne({
       email,
       deletedAt: null,
     });
 
-    // ✅ Auto-activate non-suspended users on Google login
-    if (user && user?.status === "SUSPENDED") {
+    if (user?.status === "SUSPENDED") {
       logger.warn(`User ${email} login blocked: account suspended`);
-      return { status: 403, message: "Account suspended" };
+      return {
+        status: 403,
+        message: "Account suspended",
+      };
     }
-
-    if (user && user?.status !== "ACTIVE") {
-      logger.info(`Auto-activating user ${email} on Google login (status was: ${user.status})`);
-      user.status = "ACTIVE";
-      // ✅ Update fullName only if it passes validation
-      if (fullName && fullName.length >= 4) {
-        user.fullName = fullName;
-      }
-      // ✅ If user only has LOCAL auth but no password, add GOOGLE to authProvider
-      if (!user.authProvider.includes("GOOGLE")) {
-        user.authProvider.push("GOOGLE");
-      }
-      if (!user.providerId) {
-        user.providerId = new Map();
-      }
-      user.providerId.set("GOOGLE", googleId);
-      await user.save();
-    }
-    /* =====================================================
-       4️⃣ Create user if not exists
-    ===================================================== */
 
     if (!user) {
       user = await User.create({
@@ -165,11 +116,26 @@ export const googleLoginService = async ({ code, ip, userAgent }) => {
         userId: user._id,
         fullName,
       });
+
       await UserSettings.create({
         userId: user._id,
       });
-    } else if (!user.authProvider.includes("GOOGLE")) {
-      user.authProvider.push("GOOGLE");
+    } else {
+      const storedGoogleId = user.providerId?.get?.("GOOGLE");
+
+      if (storedGoogleId && storedGoogleId !== googleId) {
+        logger.warn(
+          `Google account mismatch for ${email}: stored=${storedGoogleId}, current=${googleId}`,
+        );
+        return {
+          status: 403,
+          message: "Google account mismatch",
+        };
+      }
+
+      const providers = new Set(user.authProvider || []);
+      providers.add("GOOGLE");
+      user.authProvider = Array.from(providers);
 
       if (!user.providerId) {
         user.providerId = new Map();
@@ -177,32 +143,33 @@ export const googleLoginService = async ({ code, ip, userAgent }) => {
 
       user.providerId.set("GOOGLE", googleId);
       user.isEmailVerified = true;
+      user.status = "ACTIVE";
       user.lastLoginProvider = "GOOGLE";
 
-      await user.save();
-    } else {
-      const storedGoogleId = user.providerId?.get("GOOGLE");
+      if (fullName.length >= 4) {
+        user.fullName = fullName;
+      }
 
-      if (storedGoogleId && storedGoogleId !== googleId) {
-        logger.warn(`Google account mismatch for ${email}: stored=${storedGoogleId}, current=${googleId}`);
-        return {
-          status: 403,
-          message: "Google account mismatch",
-        };
+      await user.save();
+
+      const existingProfile = await UserProfile.findOne({ userId: user._id });
+      if (!existingProfile) {
+        await UserProfile.create({
+          userId: user._id,
+          fullName: user.fullName,
+        });
+      }
+
+      const existingSettings = await UserSettings.findOne({ userId: user._id });
+      if (!existingSettings) {
+        await UserSettings.create({
+          userId: user._id,
+        });
       }
     }
 
-    /* =====================================================
-       5️⃣ Parse Device Info
-    ===================================================== */
-
     const parser = new UAParser(userAgent);
     const ua = parser.getResult();
-
-    /* =====================================================
-       6️⃣ Create Session (7 days expiry)
-    ===================================================== */
-
     const expireAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const session = await Session.create({
@@ -214,10 +181,6 @@ export const googleLoginService = async ({ code, ip, userAgent }) => {
       userAgent,
       expireAt,
     });
-
-    /* =====================================================
-       7️⃣ Generate JWT Tokens
-    ===================================================== */
 
     const accessToken = createUserAccessToken({
       userId: user._id,
@@ -231,10 +194,6 @@ export const googleLoginService = async ({ code, ip, userAgent }) => {
       sessionId: session._id,
     });
 
-    /* =====================================================
-       8️⃣ Update login metadata
-    ===================================================== */
-
     await User.updateOne(
       { _id: user._id },
       {
@@ -245,23 +204,22 @@ export const googleLoginService = async ({ code, ip, userAgent }) => {
       },
     );
 
-    // ✅ Send ONLY safe user data back
     return {
       status: 200,
-      message: "Login successful",
+      message: "Google login successful",
       user: sanitizeUser(user),
       accessToken,
       refreshToken,
     };
   } catch (error) {
     logger.error(`GOOGLE LOGIN SERVICE ERROR: ${error.message}`);
-
     return {
       status: 500,
       message: "Server error",
     };
   }
 };
+
 export const registerUserService = async ({ email, password, fullName }) => {
   const existingUser = await User.findOne({
     email,
@@ -277,7 +235,7 @@ export const registerUserService = async ({ email, password, fullName }) => {
     return {
       status: 409,
       message:
-        "This email is already registered using Google. Please use 'Forgot Password' to set a password.",
+        "This email is already registered with Google on the website. Please use 'Forgot Password' to set a password for app login.",
     };
   }
 
@@ -558,7 +516,11 @@ export const loginUserService = async ({ email, password, ip, userAgent }) => {
     }
 
     if (!user.authProvider.includes("LOCAL")) {
-      return { status: 403, message: "Use social login" };
+      return {
+        status: 403,
+        message:
+          "This account uses Google login on the website. Please use 'Forgot Password' to set a password for app login.",
+      };
     }
 
     if (!user.isEmailVerified) {

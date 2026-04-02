@@ -12,9 +12,9 @@ export const userAuthSwagger = {
   "/api/users/auth/google-login": {
     post: {
       tags: ["User Auth"],
-      summary: "✅ Login with Google OAuth",
+      summary: "✅ Login with Google OAuth (Website)",
       description:
-        "Authenticates user using Google OAuth. Backend exchanges authorization code for tokens. Returns sanitized user object. Tokens stored in HTTP-only cookies (web) or returned as Bearer tokens (mobile). ✅ NO passwords or OTP exposed.",
+        "Authenticates user using Google OAuth for the website only. Backend exchanges a browser authorization code, sets HTTP-only cookies, and returns a sanitized user object. Native/mobile Google tokens are rejected. ✅ NO passwords or OTP exposed.",
 
       requestBody: {
         required: true,
@@ -49,14 +49,6 @@ export const userAuthSwagger = {
                     $ref: "#/components/schemas/SafeUser",
                     description: "✅ Sensitive fields removed (password, OTP, etc)"
                   },
-                  accessToken: {
-                    type: "string",
-                    description: "✅ Mobile only (Web uses HTTP-only cookies)",
-                  },
-                  refreshToken: {
-                    type: "string",
-                    description: "✅ Mobile only (Web uses HTTP-only cookies)",
-                  },
                 },
               },
             },
@@ -64,7 +56,7 @@ export const userAuthSwagger = {
         },
         400: { description: "❌ Missing authorization code" },
         401: { description: "❌ Invalid or expired token" },
-        403: { description: "❌ Access denied" },
+        403: { description: "❌ Website-only Google login or access denied" },
         500: { description: "❌ Authentication failed" },
       },
       security: [],

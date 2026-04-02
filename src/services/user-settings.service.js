@@ -4,20 +4,6 @@ import UserSettings from "../models/user-settings.js";
 import { comparePassword } from "../utils/password.util.js";
 import userSession from "../models/user-session.js";
 
-export const updateThemeService = async (userId, body) => {
-  const settings = await UserSettings.findOneAndUpdate(
-    { userId },
-    { theme: body.theme },
-    { returnDocument: "after" },
-  );
-
-  return {
-    status: 200,
-    message: "Theme updated successfully",
-    data: settings,
-  };
-};
-
 export const updateOnlineStatusService = async (userId, body) => {
   const settings = await UserSettings.findOneAndUpdate(
     { userId },
